@@ -91,8 +91,8 @@ FindBoards(const cv::Mat &I, const cv::Size &board_size,
   case cv::DataType<uint16_t>::type:
     return FindBoardsHelper<SaddlePointType, FloatImageType, uint16_t>(
         I, board_size, boards);
-  case cv::DataType<uint32_t>::type:
-    return FindBoardsHelper<SaddlePointType, FloatImageType, uint32_t>(
+  case cv::DataType<int32_t>::type:
+    return FindBoardsHelper<SaddlePointType, FloatImageType, int32_t>(
         I, board_size, boards);
   case cv::DataType<float>::type:
     return FindBoardsHelper<SaddlePointType, FloatImageType, float>(
