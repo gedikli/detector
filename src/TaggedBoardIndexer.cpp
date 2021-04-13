@@ -611,9 +611,18 @@ int fixFullCheckerBoardOrientations(const cv::Mat &img,
   return boards_fixed;
 }
 
-void TaggedBoardIndexer::fixCheckerBoards(
-    const cv::Mat &img, std::vector<BoardObservation> &boards) {
-  for (size_t b = 0; b < boards.size(); ++b) {
+struct TaggedBoardIndexer::TransformationContext
+{
+  std::vector<int> rotation_histo;
+  std::vector<int> board_id_histo;
+  std::map<int, int> offsetx_histo;
+  std::map<int, int> offsety_histo;
+};
+
+void TaggedBoardIndexer::fixCheckerBoards(const cv::Mat &img, std::vector<BoardObservation> &boards) const
+{
+  for (size_t b = 0; b < boards.size(); ++b)
+  {
     std::vector<int> tags;
     // form Quads out of each board and
     BoardObservation &obs = boards[b];
@@ -915,9 +924,9 @@ void transformToBoardTriangleLocation(int rotation, int transr, int transc,
   }
 }
 
-bool TaggedBoardIndexer::detectDeltaTag(const cv::Mat &img,
-                                        BoardObservation &obs, int r, int c,
-                                        bool lower, TagDetection &det) {
+bool TaggedBoardIndexer::detectDeltaTag(const cv::Mat &img, BoardObservation &obs, int r, int c,
+                                        bool lower, TagDetection &det, TransformationContext& context) const
+{
   cv::Mat &m = obs.board;
   // std::vector<TagDetection> &t = obs.tags;
   std::vector<cv::Point2f> &cor = obs.corner_locations;
@@ -991,21 +1000,21 @@ bool TaggedBoardIndexer::detectDeltaTag(const cv::Mat &img,
       det.obsCode = tag->second.second.x; // column on board
 
       // vote for rotation
-      rotation_histo[det.rotation]++;
-      board_id_histo[tag->second.first]++;
+      context.rotation_histo[det.rotation]++;
+      context.board_id_histo[tag->second.first]++;
 
       // compute offsets
       ox -= realc;
       oy -= realr;
-      auto itx = offsetx_histo.find(ox), ity = offsety_histo.find(oy);
-      if (itx != offsetx_histo.end())
-        offsetx_histo[ox]++;
+      auto itx = context.offsetx_histo.find(ox), ity = context.offsety_histo.find(oy);
+      if (itx != context.offsetx_histo.end())
+        context.offsetx_histo[ox]++;
       else
-        offsetx_histo[ox] = 1;
-      if (ity != offsety_histo.end())
-        offsety_histo[oy]++;
+        context.offsetx_histo[ox] = 1;
+      if (ity != context.offsety_histo.end())
+        context.offsety_histo[oy]++;
       else
-        offsety_histo[oy] = 1;
+        context.offsety_histo[oy] = 1;
 
 #ifdef DEBUG_REINDEXING
       cv::line(dbg, cv::Point(p[0].x * 65536, p[0].y * 65536),
@@ -1028,16 +1037,18 @@ bool TaggedBoardIndexer::detectDeltaTag(const cv::Mat &img,
   return false;
 }
 
-void TaggedBoardIndexer::fixTriangleBoards(
-    const cv::Mat &img, std::vector<BoardObservation> &boards) {
-  for (size_t b = 0; b < boards.size(); ++b) {
+void TaggedBoardIndexer::fixTriangleBoards (const cv::Mat &img, std::vector<BoardObservation> &boards) const
+{
+  for (size_t b = 0; b < boards.size(); ++b)
+  {
     // prepare histograms
-    rotation_histo.resize(6);
-    std::fill(rotation_histo.begin(), rotation_histo.end(), 0);
-    board_id_histo.resize(board_defs.size());
-    std::fill(board_id_histo.begin(), board_id_histo.end(), 0);
-    offsetx_histo.clear();
-    offsety_histo.clear();
+    TransformationContext context;
+    context.rotation_histo.resize(6);
+    std::fill(context.rotation_histo.begin(), context.rotation_histo.end(), 0);
+    context.board_id_histo.resize(board_defs.size());
+    std::fill(context.board_id_histo.begin(), context.board_id_histo.end(), 0);
+    context.offsetx_histo.clear();
+    context.offsety_histo.clear();
 
     std::vector<int> tags;
     // form Quads out of each board and
@@ -1055,10 +1066,10 @@ void TaggedBoardIndexer::fixTriangleBoards(
         // for each complete quad...
         TagDetection det;
         // check lower triangle
-        if (detectDeltaTag(img, obs, r, c, true, det))
+        if (detectDeltaTag(img, obs, r, c, true, det, context))
           obs.tags.push_back(det);
         // check upper triangle
-        if (detectDeltaTag(img, obs, r, c, false, det))
+        if (detectDeltaTag(img, obs, r, c, false, det, context))
           obs.tags.push_back(det);
       }
     }
@@ -1071,14 +1082,14 @@ void TaggedBoardIndexer::fixTriangleBoards(
 
     // check histos consistency
     int best_bid = -1, mx = 0, inc = 0;
-    for (size_t r = 0; r < board_id_histo.size(); ++r) {
-      if (board_id_histo[r] > mx) {
+    for (size_t r = 0; r < context.board_id_histo.size(); ++r) {
+      if (context.board_id_histo[r] > mx) {
         best_bid = int(r);
         if (best_bid != -1) // count inconsistent observations of board ids
           inc += mx;
-        mx = board_id_histo[r];
+        mx = context.board_id_histo[r];
       } else
-        inc = board_id_histo[r];
+        inc = context.board_id_histo[r];
     }
     if (best_bid == -1 || inc > 0) {
       printf("Inconsistent board ids, best: %d votes, inconsistent: %d.\n", mx,
@@ -1087,14 +1098,14 @@ void TaggedBoardIndexer::fixTriangleBoards(
     }
     int best_r = -1;
     mx = 0, inc = 0;
-    for (size_t r = 0; r < rotation_histo.size(); ++r) {
-      if (rotation_histo[r] > mx) {
+    for (size_t r = 0; r < context.rotation_histo.size(); ++r) {
+      if (context.rotation_histo[r] > mx) {
         best_r = int(r);
         if (best_r != -1) // count inconsistent observations of rotations
           inc += mx;
-        mx = rotation_histo[r];
+        mx = context.rotation_histo[r];
       } else
-        inc = rotation_histo[r];
+        inc = context.rotation_histo[r];
     }
     if (best_r == -1 || inc > 0) {
 #ifdef DEBUG_REINDEXING
@@ -1106,19 +1117,19 @@ void TaggedBoardIndexer::fixTriangleBoards(
     }
 
     // check consistency of offsets
-    if (offsetx_histo.size() > 1 || offsety_histo.size() > 1) {
+    if (context.offsetx_histo.size() > 1 || context.offsety_histo.size() > 1) {
 #ifdef DEBUG_REINDEXING
       printf("Inconsistent X,Y offsets:\n");
-      for (auto &&ofs : offsetx_histo)
+      for (auto &&ofs : context.offsetx_histo)
         printf("X [%d] = %d\n", ofs.first, ofs.second);
-      for (auto &&ofs : offsety_histo)
+      for (auto &&ofs : context.offsety_histo)
         printf("Y [%d] = %d\n", ofs.first, ofs.second);
 #endif
       continue;
     }
 
-    int ox = offsetx_histo.begin()->first;
-    int oy = offsety_histo.begin()->first;
+    int ox = context.offsetx_histo.begin()->first;
+    int oy = context.offsety_histo.begin()->first;
     obs.board_id = best_bid;
 #ifdef DEBUG_REINDEXING
     printf("Consistent observation of board %d, rotation: %d, Offset r: %d, c: "

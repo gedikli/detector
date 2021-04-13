@@ -101,7 +101,7 @@ struct TaggedBoardIndexer {
   AprilTagFamilies detectors;
   std::vector<BoardDefinition> board_defs;
   TagToBoardMap tag_to_board_map;
-  cv::Mat dbg;
+  mutable cv::Mat dbg;
   int chessboard_row;
   int chessboard_col;
 
@@ -153,31 +153,27 @@ struct TaggedBoardIndexer {
     }
   }
 
-  void writeObservationsHH(const std::string &filename,
-                           const std::vector<BoardObservation> &boards,
-                           bool output_unindexed_boards = false) const {
-    writeBoardObservationsHH(filename.c_str(), board_defs, boards,
-                             output_unindexed_boards);
+  void writeObservationsHH(const std::string &filename, const std::vector<BoardObservation> &boards,
+                           bool output_unindexed_boards = false) const
+  {
+    writeBoardObservationsHH(filename.c_str(), board_defs, boards, output_unindexed_boards);
   }
 
-  void writedDefinitionsHH(const std::string &filename) const {
+  void writedDefinitionsHH(const std::string &filename) const
+  {
     writeBoardDefinitionsHH(filename.c_str(), board_defs);
   }
 
-  void setDebugImage(cv::Mat &dbg_image) { dbg = dbg_image; }
+  void setDebugImage(cv::Mat &dbg_image) const { dbg = dbg_image; }
 
-  void fixCheckerBoards(const cv::Mat &img,
-                        std::vector<BoardObservation> &boards);
-  void fixTriangleBoards(const cv::Mat &img,
-                         std::vector<BoardObservation> &boards);
-  bool detectDeltaTag(const cv::Mat &img, BoardObservation &obs, int r, int c,
-                      bool lower, TagDetection &det);
+  void fixCheckerBoards(const cv::Mat &img, std::vector<BoardObservation> &boards) const;
+  void fixTriangleBoards(const cv::Mat &img, std::vector<BoardObservation> &boards) const;
 
 private:
-  std::vector<int> rotation_histo;
-  std::vector<int> board_id_histo;
-  std::map<int, int> offsetx_histo;
-  std::map<int, int> offsety_histo;
+  struct TransformationContext;
+  bool detectDeltaTag(const cv::Mat &img, BoardObservation &obs, int r, int c, bool lower, TagDetection &det,
+                      TaggedBoardIndexer::TransformationContext&) const;
+
 };
 
 }; // calibration

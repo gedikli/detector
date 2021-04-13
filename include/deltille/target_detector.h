@@ -130,7 +130,7 @@ public:
   /**
    */
   void run(const cv::Mat &src, CornerVector &corners,
-           cv::Mat *debug_image = nullptr) {
+           cv::Mat *debug_image = nullptr) const {
     using namespace orp::calibration;
 
     if (debug_image) {
@@ -173,6 +173,10 @@ public:
     }
   }
 
+  const std::vector<orp::calibration::BoardDefinition>& getBoardDescriptions() const
+  {
+    return _indexer.board_defs;
+  }
 private:
   orp::calibration::TaggedBoardIndexer _indexer;
 

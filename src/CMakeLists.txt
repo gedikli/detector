@@ -33,11 +33,12 @@ target_include_directories(deltille PUBLIC
 target_compile_features(deltille PUBLIC cxx_auto_type)
 target_link_libraries(deltille PUBLIC opencv)
 
-install(TARGETS deltille EXPORT ${PROJECT_NAME}Config
+install(TARGETS deltille EXPORT ${PROJECT_NAME}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include DESTINATION ".")
 
-install(EXPORT "${PROJECT_NAME}Config" DESTINATION share/${PROJECT_NAME}/cmake)
-export(TARGETS deltille FILE ${PROJECT_NAME}Config.cmake)
+install(EXPORT "${PROJECT_NAME}" DESTINATION share/${PROJECT_NAME})
+install(FILES ${PROJECT_SOURCE_DIR}/DeltilleConfig.cmake DESTINATION share/${PROJECT_NAME})
+export(TARGETS deltille FILE ${PROJECT_NAME}.cmake)
