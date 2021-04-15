@@ -207,10 +207,6 @@ void readBoardDefinitions(std::istream &in, std::vector<BoardDefinition> &defs,
       boards; // code -> location of lower left corner on the checkerboard
   auto cur = boards.end();
   int state = 0, sz = 0;
-  // generate new target_id
-  int target_id = 0;
-  if (defs.size() > 0)
-    target_id = defs.back().target_id + 1;
 
   while (std::getline(in, line)) {
     std::istringstream iss(line);
@@ -226,7 +222,7 @@ void readBoardDefinitions(std::istream &in, std::vector<BoardDefinition> &defs,
       } else {
         BoardDefinition b;
         b.id = board;
-        b.target_id = target_id;
+        b.target_id = boards.size();
         if (ly == 0) {
           // triangular boards are always equilateral
           b.cols = lx - 2;
@@ -299,7 +295,7 @@ void readBoardDefinitions(std::istream &in, std::vector<BoardDefinition> &defs,
               std::make_pair(tagid, cv::Point2i(lx, ly)));
       }
     }
-  }
+  } // while (std::getline(in, line))
 
   int unique_id_idx = 0;
   for (auto &&det : detectors) {
