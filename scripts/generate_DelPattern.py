@@ -102,7 +102,7 @@ def generate_DelTag(output, tag_id, tag_dim, codes):
     output.write("grestore\n")
 
 
-def generate_pattern(basename, cols, size, tag_name, transparent, tag_start):
+def generate_pattern(basename, cols, size, tag_name, transparent, tag_start, board_id):
     ps_filename = basename + '.ps'
     corners_filename = basename + '.csv'
     ppi = 72  # ppi for postscript coordinate frame
@@ -148,10 +148,11 @@ def generate_pattern(basename, cols, size, tag_name, transparent, tag_start):
         output.write("        grestore\n")
         output.write("} def\n\n")
         output.write("%2.8f %2.8f scale\n" % (size * ppcm, size * ppcm))
+        output.write("gsave\n")
         output.write("%f %f translate\n" % (border, border))
 
         # print the outline of the whole pattern
-        corners.write("%f, %f, %f, %f, %f, %f\n" %
+        corners.write("3, %f, %f, %f, %f, %f, %f\n" %
                       (border * size * resolution / inch2cm,
                        (paper_height - border * size) * resolution / inch2cm,
                        (cols + border) * size * resolution / inch2cm,
@@ -160,6 +161,7 @@ def generate_pattern(basename, cols, size, tag_name, transparent, tag_start):
                        (paper_height - (cols * HEIGHT + border) * size) * resolution / inch2cm))
         y = 0.0
         tag_id = tag_start
+        tags = []
         for row in range(cols):
             x = 0.5 * row
             output.write("gsave\n")
@@ -167,12 +169,15 @@ def generate_pattern(basename, cols, size, tag_name, transparent, tag_start):
                 if row % 2 == 1 and col % 2 == 1:
                     if tag_name == 't25h7':
                         generate_DelTag(output, tag_id, 5, DelTag25h7)
+                        tags.append(DelTag16h5[tag_id])
                         tag_id += 1
                     elif tag_name == 't25h9':
                         generate_DelTag(output, tag_id, 5, DelTag25h9)
+                        tags.append(DelTag25h9[tag_id])
                         tag_id += 1
                     elif tag_name == 't16h5':
                         generate_DelTag(output, tag_id, 4, DelTag16h5)
+                        tags.append(DelTag16h5[tag_id])
                         tag_id += 1
                     else:
                         output.write("lowerTri\n")
@@ -193,6 +198,14 @@ def generate_pattern(basename, cols, size, tag_name, transparent, tag_start):
 
             y += HEIGHT
             output.write("0.5 %2.8f translate\n" % HEIGHT)
+        output.write("grestore\n")
+        output.write("/Courier findfont\n0.2 scalefont\n setfont\n")
+        output.write("%f %f moveto\n" % (border - 0.5, border - 0.5))
+        output.write("(Deltille, %dx%d, %1.2fcm, #%d, %s:" % (cols, cols, size, board_id, tag_name))
+        for tag in tags:
+            output.write(" %s" % hex(tag))
+        output.write(") false charpath\n")
+        output.write(".0025 setlinewidth\nstroke\n")
         output.write("showpage\n\n")
 
     while not os.path.exists(ps_filename):
@@ -274,7 +287,7 @@ def main():
             filename = basename + str(board_id)
             print(dsc_file.closed)
             generate_dsc(dsc_file, args.cols, args.size, args.tag_name, int(board_id * tags_per_board), board_id)
-            generate_pattern(filename, args.cols, args.size, args.tag_name, args.transparent, int(board_id * tags_per_board))
+            generate_pattern(filename, args.cols, args.size, args.tag_name, args.transparent, int(board_id * tags_per_board), board_id)
     elif args.boardId < 0 or args.boardId > max_boards:
         print("board id exceeds number of possible boards for tag %s. It must be in the range [0, %2d]" %
               (args.tag_name, max_boards))
@@ -283,7 +296,7 @@ def main():
         filename = basename + str(args.boardId)
         dsc_file = open(filename + ".dsc", "w")
         generate_dsc(dsc_file, args.cols, args.size, args.tag_name, int(args.boardId * tags_per_board), args.boardId)
-        generate_pattern(filename, args.cols, args.size, args.tag_name, args.transparent, int(args.boardId * tags_per_board))
+        generate_pattern(filename, args.cols, args.size, args.tag_name, args.transparent, int(args.boardId * tags_per_board), args.boardId)
 
 
 if __name__ == "__main__":
