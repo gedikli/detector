@@ -53,11 +53,11 @@ DelTag25h9 = [0x155cbf1, 0x1e4d1b6, 0x17b0b68, 0x1eac9cd, 0x12e14ce, 0x03548bb, 
 HEIGHT = math.sqrt(3.0) * 0.5
 
 
-def generate_dsc(output, cols, size, tag_name, tag_start, board_id):
+def generate_dsc(output, cols, size, skip, tag_name, tag_start, board_id):
     output.write("%d , %d , 0 , %f\n" % (board_id, cols, size))  # board.id, lx, ly, size
     output.write("%s,1.0\n" % tag_name)  # tag family
     dx = size
-    dy = size * math.sqrt(3.0)
+    dy = size * math.sqrt(3.0) * 0.5
     x = 0.0
     y = 0.0
     cur_id = tag_start
@@ -65,10 +65,10 @@ def generate_dsc(output, cols, size, tag_name, tag_start, board_id):
         x = 0.5 * dx * row
         for col in range(cols - 2 - row):
             tag_id = -1
-            if tag_name != 'none' and row % 2 == 0 and col % 2 == 0:
+            if tag_name != 'none' and row % skip == 0 and col % skip == 0:
                 tag_id = cur_id
                 cur_id += 1
-            output.write("%3d , %2d , %2d , %2.3f , %2.3f , 0.000\n" % (tag_id, col, row, x, y))
+            output.write("%3d , %2d , %2d , %3.15f , %3.15f , 0.000\n" % (tag_id, col, row, x, y))
             x += dx
         y += dy
 
@@ -107,7 +107,7 @@ def generate_DelTag(output, tag_id, tag_dim, codes):
     output.write("grestore\n")
 
 
-def generate_pattern(basename, cols, size, tag_name, transparent, tag_start, board_id):
+def generate_pattern(basename, cols, size, skip, tag_name, transparent, tag_start, board_id):
     ps_filename = basename + '.ps'
     corners_filename = basename + '.csv'
     ppi = 72  # ppi for postscript coordinate frame
@@ -157,7 +157,7 @@ def generate_pattern(basename, cols, size, tag_name, transparent, tag_start, boa
         output.write("%f %f translate\n" % (border, border))
 
         corners.write("1, %d, %f\n" % (board_id, resolution))
-        corners.write("3, %f, %f, %f, %f, %f, %f\n" %
+        corners.write("3, %4.15f, %4.15f, %4.15f, %4.15f, %4.15f, %4.15f\n" %
                       (border * size * resolution / inch2mm,
                        (paper_height - border * size) * resolution / inch2mm,
                        (cols / 2 + border) * size * resolution / inch2mm,
@@ -173,7 +173,7 @@ def generate_pattern(basename, cols, size, tag_name, transparent, tag_start, boa
             x = 0.5 * row
             output.write("gsave\n")
             for col in range(cols - row):
-                if row % 2 == 1 and col % 2 == 1:
+                if row % skip == 1 and col % skip == 1:
                     if tag_name == 't25h7':
                         generate_DelTag(output, tag_id, 5, DelTag25h7)
                         tags.append(DelTag16h5[tag_id])
@@ -197,7 +197,7 @@ def generate_pattern(basename, cols, size, tag_name, transparent, tag_start, boa
                                                                y_cm * resolution / inch2mm))
                 if col > 0 and row > 0:
                     corner_id = (row - 1) * (cols - 2) + (col - 1)
-                    corners.write("%d, %d, %d, %f, %f\n" % (row, col, corner_id, x_cm * resolution / inch2mm -0.5,
+                    corners.write("%d, %d, %d, %4.15f, %4.15f\n" % (row, col, corner_id, x_cm * resolution / inch2mm -0.5,
                                                             y_cm * resolution / inch2mm -0.5))
                 output.write("1 0 translate\n")
                 x += 1
@@ -245,6 +245,11 @@ def main():
                         default=2.0,
                         help="size of triangle side",
                         required=False)
+    parser.add_argument('--skip',
+                        type=int,
+                        default=2,
+                        help="how many triangles to skip for each tag",
+                        required=False)
     parser.add_argument('--tag_name',
                         type=str,
                         default="t16h5",
@@ -278,7 +283,10 @@ def main():
     if basename == "":
         basename = "Deltille_%02d_%2.2f_%s_" % (args.cols, args.size, args.tag_name)
 
-    tags_per_board = int(((args.cols / 2 - 1) * (args.cols / 2)) / 2)
+    tags_per_row = int((args.cols - 4) / args.skip) + 1
+    tags_per_board = int(((tags_per_row + 1) * tags_per_row) / 2)
+    #print("================= ", tags_per_row, tags_per_board)
+    #tags_per_board = int(((args.cols / 2 - 1) * (args.cols / 2)) / 2)
 
     max_boards = int(len(DelTag16h5) / tags_per_board)
     if args.tag_name == "t25h7":
@@ -293,8 +301,8 @@ def main():
         for board_id in range(max_boards):
             filename = basename + str(board_id)
             print(dsc_file.closed)
-            generate_dsc(dsc_file, args.cols, args.size, args.tag_name, int(board_id * tags_per_board), board_id)
-            generate_pattern(filename, args.cols, args.size, args.tag_name, args.transparent,
+            generate_dsc(dsc_file, args.cols, args.size, args.skip, args.tag_name, int(board_id * tags_per_board), board_id)
+            generate_pattern(filename, args.cols, args.size, args.skip, args.tag_name, args.transparent,
                              int(board_id * tags_per_board), board_id)
     elif args.boardId < 0 or args.boardId > max_boards:
         print("board id exceeds number of possible boards for tag %s. It must be in the range [0, %2d]" %
@@ -303,8 +311,8 @@ def main():
     else:
         filename = basename + str(args.boardId)
         dsc_file = open(filename + ".dsc", "w")
-        generate_dsc(dsc_file, args.cols, args.size, args.tag_name, int(args.boardId * tags_per_board), args.boardId)
-        generate_pattern(filename, args.cols, args.size, args.tag_name, args.transparent,
+        generate_dsc(dsc_file, args.cols, args.size, args.skip, args.tag_name, int(args.boardId * tags_per_board), args.boardId)
+        generate_pattern(filename, args.cols, args.size, args.skip, args.tag_name, args.transparent,
                          int(args.boardId * tags_per_board), args.boardId)
 
 
